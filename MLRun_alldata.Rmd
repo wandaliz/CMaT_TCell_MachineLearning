@@ -1,0 +1,227 @@
+---
+title: "All Models Analysis"
+author: "Wandaliz Torres-Garcia, Ph.D."
+date: "05/04/2021"
+output: pdf_document
+
+---
+#SetUp + Libraries
+```{r setup, include=FALSE}
+require("knitr")
+
+cdir='C:/Users/WandalizTorresGarcia/Documents/2020_21 UPRM_Evaluation/Publications/TcellMachineLearningPaper_2020/ML_DataAnalysis/DataAnalysis_v20210504'
+opts_knit$set(root.dir = cdir)
+setwd(cdir)
+outdir=paste('./MLRun',Sys.Date(),sep='')
+dir.create(outdir)
+outfile=paste(outdir,"/MLRunOutput-AllData-", Sys.Date(),".txt",sep = "")
+knitr::opts_chunk$set(dev = "png",dpi = 300,echo = TRUE,cache = TRUE)
+knitr::opts_chunk$set(fig.path = outdir)
+```
+#Store Functions in Environment & Initialize/Clean Previous Output Files
+```{r,warning=FALSE,echo=FALSE}
+source('modelsfunctions.R')
+```
+
+#Read and describe dataset
+```{r}
+data=read.csv(file="AllData_20210107.csv",header=TRUE, sep=",") 
+names(data)[1]="dataset"
+head(cbind(names(data)))
+```
+#DataPreprocessing
+```{r}
+data[4:264] <- lapply(data[4:264], as.numeric)
+```
+
+#Define train and test but not used here
+```{r}
+train=data[which(data$dataset %in% "DOE"),]
+test=data[which(data$dataset %in% "ADOE"),]
+```
+
+#Identification of prediction variables and response variables
+Responses: Total.Live.cd4.mem.Cells (33), Total.Live.cd8.mem.Cells (35), total_live_mem.cells (37), Ratio of CD4 to CD8 Memory Cells (38)
+```{r}
+##PP col ids w/o vessel size 2
+Xp=c(4:5,8)
+##NMR Day 4 ids
+Xn4=c(161:172,174:180) #remove lactate 2
+Xpn4=append(Xp,Xn4)
+##NMR Day 6 ids
+Xn6=c(181:200)
+Xpn6=append(Xp,Xn6)
+##Secretome Day 6 ids
+Xs6=c(41:70)
+Xps6=append(Xp,Xs6)
+Xsn6=append(Xs6,Xn6)
+Xall=append(Xp,Xsn6)
+##Responses: Total.Live.cd4.mem.Cells (33), Total.Live.cd8.mem.Cells (35), total_live_mem.cells (37), Ratio of CD4 to CD8 Memory Cells (38)
+res=c(33,35,37,38)
+#specific response
+res=35
+
+ML=c('LASSO','PLSR','SVM','CIF','GBM','RF')
+```
+##All responses of interest - All Models
+```{r, warning=FALSE}
+#all models
+#predictors=list(Xp,Xn4,Xpn4,Xn6,Xpn6,Xs6,Xps6,Xsn6,Xall)
+#n=c("PP","N4","PP+N4","N6","PP+N6","S6","PP+S6","S6+N6","PP+S6+N6")
+#paper models
+#predictors=list(Xp,Xpn4,Xpn6,Xps6,Xall)
+#n=c("PP","PP+N4","PP+N6","PP+S6","PP+S6+N6")
+#PP only for testing
+#predictors=list(Xp)
+#n=c("PP")
+#consensus
+#predictors=list(Xall)
+#n=c("PP+S6+N6")
+predictors=list(Xpn4)
+n=c("PP+N4")
+#predictors=list(Xps6)
+#n=c("PP+S6")
+for(i in 1:length(n)){
+  pvars=predictors[[i]]
+  for(r in res){
+    for(m in ML){
+      if(m == 'LASSO'){
+        #Lasso
+        result=LASSOfunct(data,test=NULL,y=r, x=pvars)
+        out=paste(n[i],",LASSO,",names(data)[r],",R2=",round(result$R2,3),",R2test=",result$R2test,",lambda=",result$model$tuneValue$lambda,sep="")
+        print(out)
+        lassois=result$imp  
+      }else if(m == 'PLSR'){
+        #PLSR
+        result=PLSRfunct(data,test=NULL,y=r, x=pvars)
+        out=paste(n[i],",PLSR,",names(data)[r],",R2=",round(result$R2,3),",R2test=",result$R2test,",ncomp=",result$model$ncomp,sep="")
+        print(out)
+        plsris=result$imp
+      }else if(m == 'SVM'){
+        #SVM
+        result=SVMfunct(data,test=NULL,y=r, x=pvars)
+        out=paste(n[i],",SVM,",names(data)[r],",R2=",round(result$R2,3),",R2test=",result$R2test,",C=",result$C,";epsilon=",result$epsilon,sep="")
+        print(out)
+        svmis=result$imp
+      }else if(m == 'CIF'){
+        #CIF
+        result=CIFfunct(data,test=NULL,y=r, x=pvars)
+        out=paste(n[i],",CIF,",names(data)[r],",R2=",round(result$R2,3),",R2test=",result$R2test,",mtry=",result$mtry,";ntree=",result$ntree,";minsplit=",result$minsplit,";minbucket=",result$minbucket,sep="")
+        print(out)
+        cifis=result$imp
+      }else if(m == 'GBM'){
+        #GBM
+        result=GBMfunct(data,test=NULL,y=r, x=pvars)
+        out=paste(n[i],",GBM,",names(data)[r],",R2=",round(result$R2,3),",R2test=",result$R2test,",interaction.depth=",result$model$interaction.depth,";shrinkage=",result$model$shrinkage,";n.trees=",result$model$n.trees,";n.minobsinnode=",result$model$n.minobsinnode,sep="")
+        print(out)
+        gbmis=result$imp  
+      }else if(m == 'RF'){
+        #RF
+        result=RFfunct(data,test=NULL, y=r, x=pvars)
+        out=paste(n[i],",RF,",names(data)[r],",R2=",round(result$R2,3),",R2test=",result$R2test,",mtry=",result$model$mtry,";ntree=",result$model$ntree,sep="")
+        print(out)
+        rfis=result$imp
+      }
+      write.csv(result$imp,file = paste(outdir,'/',n,"_",names(data)[res],m,"_impplot",".csv",sep=""))
+      png(filename = paste(outdir,'/',n,"_",names(data)[res],m,"_impplot",".png",sep=""), width =7, height = 5, units='in', res = 300) 
+      plot(result$imp_plot)
+      dev.off()
+      png(filename = paste(outdir,'/',n,"_",names(data)[res],m,"_tuneplot",".png",sep=""), width =7, height = 5, units='in', res = 300)
+      plot(result$tune_plot)
+      dev.off()
+      write(out,file=outfile,append=TRUE)
+    }
+  }   
+}
+```
+
+#Consensus Analysis
+```{r}
+perc=0.80
+rf.imp=rfis[which(rfis$importance > quantile(rfis$importance,probs=perc)),"variables"]
+
+gbm.imp=gbmis[which(gbmis$importance > quantile(gbmis$importance,probs=perc)),"variables"]
+
+plsr.imp=plsris[which(plsris$importance > quantile(plsris$importance,probs=perc)),"variables"]
+
+svm.imp=svmis[which(svmis$importance > quantile(svmis$importance,probs=perc)),"variables"]
+
+lasso.imp=lassois[which(lassois$importance > quantile(lassois$importance,probs=perc)),"variables"]
+
+cif.imp=cifis[which(cifis$importance > quantile(cifis$importance,probs=perc)),"variables"]
+
+#Data Modeler Ranks
+##Responses: Total.Live.cd4.mem.Cells (33), Total.Live.cd8.mem.Cells (35), total_live_mem.cells (37), Ratio of CD4 to CD8 Memory Cells (38)
+srdm.imp=character(0)
+
+if(r == 33 && n == "PP+N4"){
+    srdm.imp=c("il2_conc","functional_mab_percent","Lactate.1.1.3235.D4","Ethanol.1.1795.D4","activator_conc","Formate.8.448.D4")  
+  }else if(r == 33 && n == "PP+S6+N6"){
+    srdm.imp=c("il2_conc","IL2R...6","IL13...6","IL15...6","Glycine.3.5547.D6","Histidine.7.0787.D6","IL17a...6","MIF...6","IFN_alpha...6")
+  }
+
+if(r == 35 && n == "PP+N4"){
+    srdm.imp=c("il2_conc","activator_conc","Ethanol.1.1795.D4","Histidine.7.0787.D4","Formate.8.448.D4","Lactate.1.1.3235.D4","BCAAs.0.98204.D4") 
+  }else if(r == 35 && n == "PP+S6+N6"){
+    srdm.imp=c("il2_conc","IL15...6","activator_conc","IL17a...6","GM_CSF...6","X1.5208.D6","IL2R...6","TNFa...6")  
+  }  
+
+if(r==37){
+  srdm.imp=character(0)
+}
+
+if(r == 38 && n == "PP+N4"){
+    srdm.imp=c("activator_conc","Histidine.7.0787.D4","functional_mab_percent","Ethanol.1.1795.D4","Formate.8.448.D4","Lactate.1.1.3235.D4")    
+  }else if(r == 38 && n == "PP+S6+N6"){
+    srdm.imp=c("TNFa...6","IL3...6","Formate.8.448.D6","Tyrosine.6.894.D6","GM_CSF...6","X7.5387.D6")
+  }  
+
+require(VennDiagram)
+
+ivars <- list(RF=rf.imp , GBM=gbm.imp , PLSR=plsr.imp,SVM=svm.imp, LASSO=lasso.imp, CIF=cif.imp,SR=srdm.imp)
+#v <- venn.diagram(ivars,main=paste(colnames(data[res])),cex = .6, filename=NULL, 
+ #                   fill = c("red", "blue", "green","cyan","orange"),
+#                    alpha = 0.50,
+#                    col = "transparent")
+
+#grid.newpage()
+#grid.draw(v)
+
+#lapply(v,  names)
+# We are interested in the labels
+#lapply(v, function(i) i$label)
+
+
+library(venn)
+library(ggplot2)
+library(ggpolypath)
+png(filename = paste(outdir,'/',n,"_",names(data)[res],"_topvenn",perc,".png",sep=""), bg = "transparent",width =5, height = 5, units='in', res = 300) 
+venn(ivars, zcolor = c("red", "purple", "blue", "yellow", "green", "orange","black"), box = FALSE, ilabels=TRUE)
+
+int=Reduce(intersect,ivars)
+dev.off()
+
+```
+
+#Top-Performing
+```{r}
+library(rlist)
+#k <- unique(unlist(lapply(ivars, function(x) x)))
+
+freq=as.data.frame(table(unlist(lapply(ivars, unique))))
+names(freq)=c("Variable","Freq")
+
+freq=freq[order(freq$Freq,decreasing = TRUE),]
+
+ggplot(freq[(which(freq$Freq>=4)),],aes(y=reorder(Variable,Freq),x=Freq,fill = factor(Freq)))+geom_col(position = 'dodge')+labs(
+    y = NULL,
+    x = "Intersection across ML models",
+    title = paste("Top-Performing Features using ",perc, " Percentile Cut-off",sep=""),
+    subtitle = paste(names(data)[res]),
+    caption = "CMaT T Cell Project",
+    fill=""
+  )
+ggsave(filename= paste(outdir,'/',n,"_",names(data)[res],".topbar",perc,".png",sep=""), device='tiff', dpi=900)
+```
+
+
